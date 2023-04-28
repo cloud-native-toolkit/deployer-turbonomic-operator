@@ -149,8 +149,6 @@ spec:
         name: openshift-client
       runAfter:
         - get-namespace-uid
-      # runAfter:
-      #   - add-namespace
       params:
         - name: ARGS
           value: ["turbo-test-2"]
@@ -198,6 +196,7 @@ spec:
     - name: wait-for-crd-creation
       taskRef:
         name: openshift-client
+      retries: 5
       runAfter:
         - install-turbo-operator-2
       params:
@@ -207,6 +206,7 @@ spec:
           value: ["turbo-test-2"]
         - name: SCRIPT
           value: |
+            sleep 15
             oc wait -n $1 --for=condition=established crd/xls.charts.helm.k8s.io
     - name: install-turbo-platform
       taskRef:
