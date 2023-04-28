@@ -1,0 +1,249 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openshift-client-sa
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: openshift-client-role
+rules:
+  # Core API
+  - apiGroups: [""]
+    resources:
+      ["services", "pods", "deployments", "configmaps", "secrets", "namespaces"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  # Apps API
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "jobs"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  # operators
+  - apiGroups: ["operators.coreos.com"]
+    resources:
+      [
+        "catalogsources",
+        "installplan",
+        "clusterserviceversions",
+        "subscriptions",
+        "operatorgroups",
+      ]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  - apiGroups: ["charts.helm.k8s.io"]
+    resources: ["xls"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  - apiGroups: ["project.openshift.io"]
+    resources: ["projects"]
+    verbs: ["get"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  # Tekton API
+  - apiGroups: ["tekton.dev"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-client-binding
+subjects:
+  - kind: ServiceAccount
+    name: openshift-client-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: openshift-client-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: openshift-client
+  labels:
+    app.kubernetes.io/version: "0.1"
+  annotations:
+    tekton.dev/categories: Openshift
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/tags: cli
+    tekton.dev/displayName: "openshift client"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: >-
+    This task runs commands against the cluster where the task run is
+    being executed.
+    OpenShift is a Kubernetes distribution from Red Hat which provides oc,
+    the OpenShift CLI that complements kubectl for simplifying deployment
+    and configuration applications on OpenShift.
+  params:
+    - name: SCRIPT
+      description: The OpenShift CLI arguments to run
+      type: string
+      default: "oc $@"
+    - name: ARGS
+      description: The OpenShift CLI arguments to run
+      type: array
+      default:
+        - "help"
+    - name: VERSION
+      description: The OpenShift Version to use
+      type: string
+      default: "4.10"
+  resources:
+    inputs:
+      - name: source
+        type: git
+        optional: true
+  results:
+    - name: oc-output
+      description: The output of the oc command
+  steps:
+    - name: oc
+      image: quay.io/openshift/origin-cli:$(params.VERSION)
+      script: "$(params.SCRIPT)"
+      args:
+        - "$(params.ARGS)"
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: turbo-server-deploy
+spec:
+  tasks:
+    - name: add-namespace
+      taskRef:
+        name: openshift-client
+      params:
+        - name: ARGS
+          value: ["turbo-test-2"]
+        - name: VERSION
+          value: "4.10"
+        - name: SCRIPT
+          value: |
+            oc apply -f - <<EOF 
+            kind: Namespace
+            apiVersion: v1
+            metadata:
+              name: $1
+            EOF
+    - name: get-namespace-uid
+      taskRef:
+        name: openshift-client
+      runAfter:
+        - add-namespace
+      params:
+        - name: ARGS
+          value: ["turbo-test-2"]
+        - name: VERSION
+          value: "4.10"
+        - name: SCRIPT
+          value: |
+            oc get project $1 -o json | grep '"openshift.io/sa.scc.uid-range": "' | sed -n 's/.*"openshift.io\/sa.scc.uid-range": "\(.*\)\/.*/\1/p' | tee $(results.oc-output.path)
+    - name: install-turbo-operator-1
+      taskRef:
+        name: openshift-client
+      runAfter:
+        - get-namespace-uid
+      # runAfter:
+      #   - add-namespace
+      params:
+        - name: ARGS
+          value: ["turbo-test-2"]
+        - name: VERSION
+          value: "4.10"
+        - name: SCRIPT
+          value: |
+            oc apply -f - <<EOF
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+              annotations:
+                olm.providedAPIs: Xl.v1.charts.helm.k8s.io
+              name: turbonomic-mkk5d
+              namespace: $1
+            spec:
+              targetNamespaces:
+              - $1
+            EOF
+    - name: install-turbo-operator-2
+      taskRef:
+        name: openshift-client
+      runAfter:
+        - install-turbo-operator-1
+      params:
+        - name: ARGS
+          value: ["turbo-test-2"]
+        - name: VERSION
+          value: "4.10"
+        - name: SCRIPT
+          value: |
+            oc apply -f - <<EOF
+            apiVersion: operators.coreos.com/v1alpha1
+            kind: Subscription
+            metadata:
+              labels:
+                operators.coreos.com/t8c-certified.turbonomic: ""
+              name: t8c-certified
+              namespace: $1
+            spec:
+              name: t8c-certified
+              source: certified-operators
+              sourceNamespace: openshift-marketplace
+            EOF
+    - name: wait-for-crd-creation
+      taskRef:
+        name: openshift-client
+      runAfter:
+        - install-turbo-operator-2
+      params:
+        - name: VERSION
+          value: "4.10"
+        - name: ARGS
+          value: ["turbo-test-2"]
+        - name: SCRIPT
+          value: |
+            oc wait -n $1 --for=condition=established crd/xls.charts.helm.k8s.io
+    - name: install-turbo-platform
+      taskRef:
+        name: openshift-client
+      runAfter:
+        - wait-for-crd-creation
+      params:
+        - name: VERSION
+          value: "4.10"
+        - name: ARGS
+          value: ["turbo-test-2", $(tasks.get-namespace-uid.results.oc-output)]
+        - name: SCRIPT
+          value: |
+            oc apply -n $1 -f - <<EOF
+            apiVersion: charts.helm.k8s.io/v1
+            kind: Xl
+            metadata:
+              name: xl-release
+            spec:
+              aws:
+                enabled: true
+              azure:
+                enabled: true
+              global:
+                customImageNames: false
+                repository: icr.io/cpopen/turbonomic
+                securityContext:
+                  fsGroup: $2
+                tag: 8.8.5
+              instana:
+                enabled: true
+              mysql:
+                enabled: true
+              openshiftingress:
+                enabled: true
+              platform:
+                enabled: true
+              vcenter:
+                enabled: true
+            EOF

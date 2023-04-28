@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: turbo-server-deploy-run
+spec:
+  pipelineRef:
+    name: turbo-server-deploy
+  serviceAccountName: openshift-client-sa
+  workspaces:
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+  params:
+    - name: namespace
+      value: "turbo-test-2"
