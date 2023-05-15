@@ -5,7 +5,6 @@ metadata:
 spec:
   pipelineRef:
     name: turbo-server-deploy
-  serviceAccountName: openshift-client-sa
   workspaces:
     - name: shared-workspace
       volumeClaimTemplate:
