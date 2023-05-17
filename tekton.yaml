@@ -51,15 +51,24 @@ kind: Pipeline
 metadata:
   name: turbo-server-deploy
 spec:
+  params:
+    - name: namespace
+      type: string
+      description: Namespace for turbonomic deployment
+      default: turbonomic-ns
+    - name: ocp-client-version
+      type: string
+      description: Openshift client version
+      default: "4.10"
   tasks:
     - name: add-namespace
       taskRef:
         name: openshift-client
       params:
         - name: ARGS
-          value: ["turbo-test-2"]
+          value: [$(params.namespace)]
         - name: VERSION
-          value: "4.10"
+          value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc apply -f - <<EOF 
@@ -75,9 +84,9 @@ spec:
         - add-namespace
       params:
         - name: ARGS
-          value: ["turbo-test-2"]
+          value: [$(params.namespace)]
         - name: VERSION
-          value: "4.10"
+          value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc get project $1 -o json | grep '"openshift.io/sa.scc.uid-range": "' | sed -n 's/.*"openshift.io\/sa.scc.uid-range": "\(.*\)\/.*/\1/p' | tee $(results.oc-output.path)
@@ -88,9 +97,9 @@ spec:
         - get-namespace-uid
       params:
         - name: ARGS
-          value: ["turbo-test-2"]
+          value: [$(params.namespace)]
         - name: VERSION
-          value: "4.10"
+          value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc apply -f - <<EOF
@@ -112,9 +121,9 @@ spec:
         - install-turbo-operator-1
       params:
         - name: ARGS
-          value: ["turbo-test-2"]
+          value: [$(params.namespace)]
         - name: VERSION
-          value: "4.10"
+          value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc apply -f - <<EOF
@@ -138,9 +147,9 @@ spec:
         - install-turbo-operator-2
       params:
         - name: VERSION
-          value: "4.10"
+          value: $(params.ocp-client-version)
         - name: ARGS
-          value: ["turbo-test-2"]
+          value: [$(params.namespace)]
         - name: SCRIPT
           value: |
             sleep 15
@@ -152,9 +161,10 @@ spec:
         - wait-for-crd-creation
       params:
         - name: VERSION
-          value: "4.10"
+          value: $(params.ocp-client-version)
         - name: ARGS
-          value: ["turbo-test-2", $(tasks.get-namespace-uid.results.oc-output)]
+          value:
+            [$(params.namespace), $(tasks.get-namespace-uid.results.oc-output)]
         - name: SCRIPT
           value: |
             oc apply -n $1 -f - <<EOF

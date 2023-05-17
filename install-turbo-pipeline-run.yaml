@@ -16,4 +16,6 @@ spec:
               storage: 1Gi
   params:
     - name: namespace
-      value: "turbo-test-2"
+      value: "turbonomic-ns"
+    - name: ocp-client-version
+      value: "4.10"

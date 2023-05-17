@@ -5,6 +5,8 @@ Tektoncd pipeline to deploy the Turbonomic Operator for IBM TechZone Deployer (e
 ## Prerequisites
 
 - Openshift Cluster with OpenShift Pipelines 1.8 installed
+- Piplines Service Account requires elevated privileges  
+  `oc create clusterrolebinding pipeline-clusteradmin-crb --clusterrole=cluster-admin --serviceaccount=default:pipeline`
 
 ## Tasks
 
