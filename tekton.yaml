@@ -63,10 +63,9 @@ spec:
   tasks:
     - name: add-namespace
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       params:
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: VERSION
           value: $(params.ocp-client-version)
         - name: SCRIPT
@@ -75,7 +74,7 @@ spec:
             kind: Namespace
             apiVersion: v1
             metadata:
-              name: $1
+              name: $(params.namespace)
             EOF
     - name: get-namespace-uid
       taskRef:
@@ -92,12 +91,11 @@ spec:
             oc get project $1 -o json | grep '"openshift.io/sa.scc.uid-range": "' | sed -n 's/.*"openshift.io\/sa.scc.uid-range": "\(.*\)\/.*/\1/p' | tee $(results.oc-output.path)
     - name: install-turbo-operator-1
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       runAfter:
         - get-namespace-uid
       params:
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: VERSION
           value: $(params.ocp-client-version)
         - name: SCRIPT
@@ -109,19 +107,18 @@ spec:
               annotations:
                 olm.providedAPIs: Xl.v1.charts.helm.k8s.io
               name: turbonomic-mkk5d
-              namespace: $1
+              namespace: $(params.namespace)
             spec:
               targetNamespaces:
-              - $1
+              - $(params.namespace)
             EOF
     - name: install-turbo-operator-2
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       runAfter:
         - install-turbo-operator-1
       params:
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: VERSION
           value: $(params.ocp-client-version)
         - name: SCRIPT
@@ -133,7 +130,7 @@ spec:
               labels:
                 operators.coreos.com/t8c-certified.turbonomic: ""
               name: t8c-certified
-              namespace: $1
+              namespace: $(params.namespace)
             spec:
               name: t8c-certified
               source: certified-operators
@@ -141,33 +138,30 @@ spec:
             EOF
     - name: wait-for-crd-creation
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       retries: 5
       runAfter:
         - install-turbo-operator-2
       params:
         - name: VERSION
           value: $(params.ocp-client-version)
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: SCRIPT
           value: |
             sleep 15
-            oc wait -n $1 --for=condition=established crd/xls.charts.helm.k8s.io
+            oc wait -n $(params.namespace) --for=condition=established crd/xls.charts.helm.k8s.io
     - name: install-turbo-platform
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       runAfter:
         - wait-for-crd-creation
       params:
         - name: VERSION
           value: $(params.ocp-client-version)
-        - name: ARGS
-          value:
-            [$(params.namespace), $(tasks.get-namespace-uid.results.oc-output)]
         - name: SCRIPT
           value: |
-            oc apply -n $1 -f - <<EOF
+            oc apply -n $(params.namespace) -f - <<EOF
             apiVersion: charts.helm.k8s.io/v1
             kind: Xl
             metadata:
@@ -181,7 +175,7 @@ spec:
                 customImageNames: false
                 repository: icr.io/cpopen/turbonomic
                 securityContext:
-                  fsGroup: $2
+                  fsGroup: $(tasks.get-namespace-uid.results.oc-output)
                 tag: 8.8.5
               instana:
                 enabled: true
@@ -194,3 +188,18 @@ spec:
               vcenter:
                 enabled: true
             EOF
+
+            while true
+            do
+            # readarray -t status <<<$(oc get -n turbonomic-ns XL/xl-release -o yaml | yq '.status.conditions')
+            is_deployed=$(oc get -n turbonomic-ns XL/xl-release -o yaml | yq '.status.conditions.[] | select(.type == "Deployed") | contains({"reason": "InstallSuccessful", "status": "'True'"})')
+            echo $is_deployed
+
+            if [[ $is_deployed != "true" ]]; then
+                echo "Waiting for operator to be Deployed."
+            else
+                echo "Turbonomic operator is Deployed."
+                break
+            fi
+            sleep 10
+            done
