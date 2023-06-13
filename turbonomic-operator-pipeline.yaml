@@ -191,14 +191,23 @@ spec:
 
             while true
             do
-            is_deployed=$(oc get -n turbonomic-ns XL/xl-release -o yaml | yq '.status.conditions.[] | select(.type == "Deployed") | contains({"reason": "InstallSuccessful", "status": "'True'"})')
-
-            if [[ $is_deployed != "true" ]]; then
+              is_deployed=$(oc get -n turbonomic-ns XL/xl-release -o yaml | yq '.status.conditions.[] | select(.type == "Deployed") | contains({"reason": "InstallSuccessful", "status": "'True'"})')
+              if [[ $is_deployed != "true" ]]; then
                 echo "Waiting for operator to be Deployed."
-            else
+              else
                 echo "Turbonomic operator is Deployed."
                 break
-            fi
+              fi
+              sleep 10
+            done
 
-            sleep 10
+            while true
+            do
+              if oc wait -n turbonomic-ns pod --for=condition=Ready --all; then
+                echo "All pods Ready."
+                break
+              else
+                echo "Still waiting for pods to be Ready."
+              fi
+              sleep 10
             done
