@@ -191,7 +191,7 @@ spec:
 
             while true
             do
-              is_deployed=$(oc get -n turbonomic-ns XL/xl-release -o yaml | yq '.status.conditions.[] | select(.type == "Deployed") | contains({"reason": "InstallSuccessful", "status": "'True'"})')
+              is_deployed=$(oc get -n $(params.namespace) XL/xl-release -o yaml | yq '.status.conditions.[] | select(.type == "Deployed") | contains({"reason": "InstallSuccessful", "status": "'True'"})')
               if [[ $is_deployed != "true" ]]; then
                 echo "Waiting for operator to be Deployed."
               else
