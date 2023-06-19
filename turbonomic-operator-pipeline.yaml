@@ -1,50 +1,3 @@
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: openshift-client
-  labels:
-    app.kubernetes.io/version: "0.1"
-  annotations:
-    tekton.dev/categories: Openshift
-    tekton.dev/pipelines.minVersion: "0.12.1"
-    tekton.dev/tags: cli
-    tekton.dev/displayName: "openshift client"
-    tekton.dev/platforms: "linux/amd64"
-spec:
-  description: >-
-    This task runs commands against the cluster where the task run is
-    being executed.
-    OpenShift is a Kubernetes distribution from Red Hat which provides oc,
-    the OpenShift CLI that complements kubectl for simplifying deployment
-    and configuration applications on OpenShift.
-  params:
-    - name: SCRIPT
-      description: The OpenShift CLI arguments to run
-      type: string
-      default: "oc $@"
-    - name: ARGS
-      description: The OpenShift CLI arguments to run
-      type: array
-      default:
-        - "help"
-    - name: VERSION
-      description: The OpenShift Version to use
-      type: string
-      default: "4.10"
-  resources:
-    inputs:
-      - name: source
-        type: git
-        optional: true
-  results:
-    - name: oc-output
-      description: The output of the oc command
-  steps:
-    - name: oc
-      image: quay.io/openshift/origin-cli:$(params.VERSION)
-      script: "$(params.SCRIPT)"
-      args:
-        - "$(params.ARGS)"
 ---
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
@@ -63,10 +16,9 @@ spec:
   tasks:
     - name: add-namespace
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       params:
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: VERSION
           value: $(params.ocp-client-version)
         - name: SCRIPT
@@ -75,29 +27,27 @@ spec:
             kind: Namespace
             apiVersion: v1
             metadata:
-              name: $1
+              name: $(params.namespace)
             EOF
     - name: get-namespace-uid
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       runAfter:
         - add-namespace
       params:
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: VERSION
           value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
-            oc get project $1 -o json | grep '"openshift.io/sa.scc.uid-range": "' | sed -n 's/.*"openshift.io\/sa.scc.uid-range": "\(.*\)\/.*/\1/p' | tee $(results.oc-output.path)
+            oc get project $(params.namespace) -o json | grep '"openshift.io/sa.scc.uid-range": "' | sed -n 's/.*"openshift.io\/sa.scc.uid-range": "\(.*\)\/.*/\1/p' | tee $(results.output.path)
     - name: install-turbo-operator-1
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       runAfter:
         - get-namespace-uid
       params:
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: VERSION
           value: $(params.ocp-client-version)
         - name: SCRIPT
@@ -109,19 +59,18 @@ spec:
               annotations:
                 olm.providedAPIs: Xl.v1.charts.helm.k8s.io
               name: turbonomic-mkk5d
-              namespace: $1
+              namespace: $(params.namespace)
             spec:
               targetNamespaces:
-              - $1
+              - $(params.namespace)
             EOF
     - name: install-turbo-operator-2
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       runAfter:
         - install-turbo-operator-1
       params:
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: VERSION
           value: $(params.ocp-client-version)
         - name: SCRIPT
@@ -133,7 +82,7 @@ spec:
               labels:
                 operators.coreos.com/t8c-certified.turbonomic: ""
               name: t8c-certified
-              namespace: $1
+              namespace: $(params.namespace)
             spec:
               name: t8c-certified
               source: certified-operators
@@ -141,33 +90,31 @@ spec:
             EOF
     - name: wait-for-crd-creation
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       retries: 5
       runAfter:
         - install-turbo-operator-2
       params:
         - name: VERSION
           value: $(params.ocp-client-version)
-        - name: ARGS
-          value: [$(params.namespace)]
         - name: SCRIPT
           value: |
             sleep 15
-            oc wait -n $1 --for=condition=established crd/xls.charts.helm.k8s.io
+            oc wait -n $(params.namespace) --for=condition=established crd/xls.charts.helm.k8s.io
     - name: install-turbo-platform
+      timeout: 6h0m0s
       taskRef:
-        name: openshift-client
+        kind: Task
+        name: ibm-pak
       runAfter:
         - wait-for-crd-creation
       params:
         - name: VERSION
           value: $(params.ocp-client-version)
-        - name: ARGS
-          value:
-            [$(params.namespace), $(tasks.get-namespace-uid.results.oc-output)]
         - name: SCRIPT
           value: |
-            oc apply -n $1 -f - <<EOF
+            oc apply -n $(params.namespace) -f - <<EOF
             apiVersion: charts.helm.k8s.io/v1
             kind: Xl
             metadata:
@@ -181,7 +128,7 @@ spec:
                 customImageNames: false
                 repository: icr.io/cpopen/turbonomic
                 securityContext:
-                  fsGroup: $2
+                  fsGroup: $(tasks.get-namespace-uid.results.output)
                 tag: 8.8.5
               instana:
                 enabled: true
@@ -194,3 +141,26 @@ spec:
               vcenter:
                 enabled: true
             EOF
+
+            while true
+            do
+              is_deployed=$(oc get -n $(params.namespace) XL/xl-release -o yaml | yq '.status.conditions.[] | select(.type == "Deployed") | contains({"reason": "InstallSuccessful", "status": "'True'"})')
+              if [[ $is_deployed != "true" ]]; then
+                echo "Waiting for operator to be Deployed."
+              else
+                echo "Turbonomic operator is Deployed."
+                break
+              fi
+              sleep 10
+            done
+
+            while true
+            do
+              if oc wait -n turbonomic-ns pod --for=condition=Ready --all; then
+                echo "All pods Ready."
+                break
+              else
+                echo "Still waiting for pods to be Ready."
+              fi
+              sleep 10
+            done
