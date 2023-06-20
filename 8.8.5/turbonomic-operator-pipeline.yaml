@@ -13,6 +13,10 @@ spec:
       type: string
       description: Openshift client version
       default: "4.10"
+    - name: turbonomic-version
+      type: string
+      description: Turbonomic version
+      default: "8.8.5"
   tasks:
     - name: add-namespace
       taskRef:
@@ -129,7 +133,7 @@ spec:
                 repository: icr.io/cpopen/turbonomic
                 securityContext:
                   fsGroup: $(tasks.get-namespace-uid.results.output)
-                tag: 8.8.5
+                tag: $(params.turbonomic-version)
               instana:
                 enabled: true
               mysql:
