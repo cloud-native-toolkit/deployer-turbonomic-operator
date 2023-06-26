@@ -23,8 +23,8 @@ spec:
         kind: Task
         name: ibm-pak
       params:
-        - name: VERSION
-          value: $(params.ocp-client-version)
+        # - name: VERSION
+        #   value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc apply -f - <<EOF 
@@ -40,8 +40,8 @@ spec:
       runAfter:
         - add-namespace
       params:
-        - name: VERSION
-          value: $(params.ocp-client-version)
+        # - name: VERSION
+        #   value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc get project $(params.namespace) -o json | grep '"openshift.io/sa.scc.uid-range": "' | sed -n 's/.*"openshift.io\/sa.scc.uid-range": "\(.*\)\/.*/\1/p' | tee $(results.output.path)
@@ -52,8 +52,8 @@ spec:
       runAfter:
         - get-namespace-uid
       params:
-        - name: VERSION
-          value: $(params.ocp-client-version)
+        # - name: VERSION
+        #   value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc apply -f - <<EOF
@@ -75,8 +75,8 @@ spec:
       runAfter:
         - install-turbo-operator-1
       params:
-        - name: VERSION
-          value: $(params.ocp-client-version)
+        # - name: VERSION
+        #   value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc apply -f - <<EOF
@@ -100,8 +100,8 @@ spec:
       runAfter:
         - install-turbo-operator-2
       params:
-        - name: VERSION
-          value: $(params.ocp-client-version)
+        # - name: VERSION
+        #   value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             sleep 15
@@ -114,8 +114,8 @@ spec:
       runAfter:
         - wait-for-crd-creation
       params:
-        - name: VERSION
-          value: $(params.ocp-client-version)
+        # - name: VERSION
+        #   value: $(params.ocp-client-version)
         - name: SCRIPT
           value: |
             oc apply -n $(params.namespace) -f - <<EOF
