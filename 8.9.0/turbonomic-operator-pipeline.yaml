@@ -9,10 +9,6 @@ spec:
       type: string
       description: Namespace for turbonomic deployment
       default: turbonomic-ns
-    - name: ocp-client-version
-      type: string
-      description: Openshift client version
-      default: "4.12"
     - name: turbonomic-version
       type: string
       description: Turbonomic version
