@@ -12,11 +12,11 @@ spec:
     - name: ocp-client-version
       type: string
       description: Openshift client version
-      default: "4.10"
+      default: "4.12"
     - name: turbonomic-version
       type: string
       description: Turbonomic version
-      default: "8.8.5"
+      default: "8.9.0"
   tasks:
     - name: add-namespace
       taskRef:

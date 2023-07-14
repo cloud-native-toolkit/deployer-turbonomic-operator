@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: turbo-server-deploy-run
+spec:
+  timeout: 6h0m0s
+  pipelineRef:
+    name: turbo-server-deploy
+  params:
+    - name: namespace
+      value: "turbonomic-ns"
+    - name: ocp-client-version
+      value: "4.12"
+    - name: turbonomic-version
+      value: "8.9.0"
