@@ -12,7 +12,7 @@ spec:
     - name: turbonomic-version
       type: string
       description: Turbonomic version
-      default: "8.8.5"
+      default: "8.9.0"
   tasks:
     - name: add-namespace
       taskRef:
