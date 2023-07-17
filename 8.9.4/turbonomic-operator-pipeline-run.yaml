@@ -10,4 +10,4 @@ spec:
     - name: namespace
       value: "turbonomic-ns"
     - name: turbonomic-version
-      value: "8.9.0"
+      value: "8.9.4"
