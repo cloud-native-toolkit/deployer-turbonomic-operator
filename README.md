@@ -4,7 +4,7 @@ This repository contains a set of Tekton pipelines to deploy the Turbonomic Oper
 
 ## Prerequisites
 
-An IBM Technology Zone `deployer` cluster is assumed to be configured with an appropriate Red Hat OpenShift version for the Cloud Pak for Integration version you wish to deploy, with appropriate sizing. Refer to [IBM Cloud Pak for Integration documentation](https://www.ibm.com/docs/en/cloud-paks/cp-integration/2022.4) for more information.
+An IBM Technology Zone `deployer` cluster is assumed to be configured with an appropriate Red Hat OpenShift version for the solution you wish to deploy, with appropriate sizing.
 
 A `deployer` cluster is configured with the following items:
 
@@ -29,4 +29,4 @@ The top-level folders in this repository are for the different Turbonomic Operat
 
 `oc apply -f turbonomic-operator-pipeline.yaml` to install configure service account and install tasks and pipeline
 
-`oc create -f turbonomic-operator-pipeline-run.yaml` to kick off pipeline with default Turbonomic version 8.8.5
+`oc create -f turbonomic-operator-pipeline-run.yaml` to kick off pipeline with default Turbonomic version 8.9.4
