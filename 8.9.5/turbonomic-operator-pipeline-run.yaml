@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: turbo-server-deploy-run
+  generateName: turbo-server-deploy-run-
 spec:
   timeout: 6h0m0s
   pipelineRef:
@@ -10,4 +10,4 @@ spec:
     - name: namespace
       value: "turbonomic-ns"
     - name: turbonomic-version
-      value: "8.9.4"
+      value: "8.9.5"
