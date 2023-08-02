@@ -29,4 +29,4 @@ The top-level folders in this repository are for the different Turbonomic Operat
 
 `oc apply -f turbonomic-operator-pipeline.yaml` to install configure service account and install tasks and pipeline
 
-`oc create -f turbonomic-operator-pipeline-run.yaml` to kick off pipeline with default Turbonomic version 8.9.4
+`oc create -f turbonomic-operator-pipeline-run.yaml` to kick off pipeline with default Turbonomic version 8.9.5
