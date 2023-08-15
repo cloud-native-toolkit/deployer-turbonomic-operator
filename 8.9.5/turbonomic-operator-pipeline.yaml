@@ -13,7 +13,47 @@ spec:
       type: string
       description: Turbonomic version
       default: "8.9.5"
+  finally:
+    - name: update-configmap-failure
+      when:
+        - input: $(tasks.install-turbo-platform.status)
+          operator: notin
+          values: ["Succeeded"]
+      taskRef:
+        kind: Task
+        name: ibm-pak
+      params:
+        - name: SCRIPT
+          value: |
+            oc patch configmap/pipeline-output -p '{"data":{"Status":"Pipeline run failed. See Pipeline run for more details and consider running the pipeline again."}}'
+    - name: update-configmap-success
+      when:
+        - input: $(tasks.install-turbo-platform.status)
+          operator: in
+          values: ["Succeeded"]
+      taskRef:
+        kind: Task
+        name: ibm-pak
+      params:
+        - name: SCRIPT
+          value: |
+            oc patch configmap/pipeline-output -p '{"data":{"Status":"Pipeline run Successful","Turbonomic-Route":"$(tasks.install-turbo-platform.results.output)"}}'
   tasks:
+    - name: add-configmap
+      taskRef:
+        kind: Task
+        name: ibm-pak
+      params:
+        - name: SCRIPT
+          value: |
+            oc apply -f - <<EOF 
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: pipeline-output
+            data:
+              Status: "Resource not fully provisioned. Please check pipeline runs to see current status of the pipeline."
+            EOF
     - name: add-namespace
       taskRef:
         kind: Task
@@ -149,11 +189,18 @@ spec:
 
             while true
             do
-              if oc wait -n turbonomic-ns pod --for=condition=Ready --all; then
+              RESULT=$(oc wait -n $(params.namespace) pod --for=condition=Ready --all)
+              if [$? -eq 0]; then
                 echo "All pods Ready."
                 break
               else
+                if [[ $RESULT == *"pod/api"* && $RESULT == *"pod/kafka"* && $RESULT == *"pod/db"* && $RESULT == *"pod/ui"* && $RESULT == *"pod/nginx"* && $RESULT == *"pod/zookeeper"* && $RESULT == *"pod/t8c-operator"* ]]; then
+                  echo "All necessary pods ready."
+                  break
+                fi
                 echo "Still waiting for pods to be Ready."
               fi
               sleep 10
             done
+
+            oc get routes -n $(params.namespace) -o json | grep '"host": "' | sed -n 's/.*"host": "\([^"]*\)".*/\1/p; q' | tr -d '\n' | tee $(results.output.path)
