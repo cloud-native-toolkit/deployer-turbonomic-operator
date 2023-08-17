@@ -39,21 +39,6 @@ spec:
           value: |
             oc patch configmap/pipeline-output -p '{"data":{"Status":"Pipeline run Successful","Turbonomic-Route":"$(tasks.install-turbo-platform.results.output)"}}'
   tasks:
-    - name: add-configmap
-      taskRef:
-        kind: Task
-        name: ibm-pak
-      params:
-        - name: SCRIPT
-          value: |
-            oc apply -f - <<EOF 
-            apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: pipeline-output
-            data:
-              Status: "Resource not fully provisioned. Please check pipeline runs to see current status of the pipeline."
-            EOF
     - name: add-namespace
       taskRef:
         kind: Task
