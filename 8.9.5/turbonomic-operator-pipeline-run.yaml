@@ -1,9 +1,10 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   generateName: turbo-server-deploy-run-
 spec:
-  timeout: 6h0m0s
+  timeouts:
+    pipeline: 6h0m0s
   pipelineRef:
     name: turbo-server-deploy
   params:
