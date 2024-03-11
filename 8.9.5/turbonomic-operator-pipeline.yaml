@@ -175,7 +175,7 @@ spec:
             while true
             do
               RESULT=$(oc wait -n $(params.namespace) pod --for=condition=Ready --all)
-              if [$? -eq 0]; then
+              if [ $? -eq 0 ]; then
                 echo "All pods Ready."
                 break
               else
